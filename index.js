@@ -1,12 +1,12 @@
+// Select the DOM elements
 const firstInputEl = document.getElementById('firstInput');
 const secondInputEl = document.getElementById('secondInput');
 
 const firstSelectEl = document.getElementById('firstSelect');
 const secondSelectEl = document.getElementById('secondSelect');
 
+// Convert one rate into another rate
 const convert = async (e) => {
-    console.log(e.target.id)
-
     let fromInput, fromSelect, toInput, toSelect;
 
     // if the first Input or Select was changed
@@ -29,10 +29,12 @@ const convert = async (e) => {
 
     const { [fromSelect.value]: fromCurrency } = await fetchCurrency(fromSelect.value);
 
-    // console.log(fromCurrency);
     toInput.value = fromInput.value * fromCurrency[toSelect.value];
+
+    fetchHistoryRates(fromSelect.value, toSelect.value);
 }
 
+// Register event listeners
 firstInputEl.addEventListener('keyup', convert);
 firstInputEl.addEventListener('change', convert);
 secondInputEl.addEventListener('keyup', convert);
@@ -41,14 +43,12 @@ secondInputEl.addEventListener('change', convert);
 firstSelectEl.addEventListener('change', convert);
 secondSelectEl.addEventListener('change', convert);
 
-
+// Fetch all the currencies
 const fetchCurrencies = async () => {
     const API_URL = 'https://cdn.jsdelivr.net/gh/fawazahmed0/currency-api@1/latest/currencies.json';
 
     const response = await fetch(API_URL);
     const data = await response.json();
-
-    // console.log(data);
 
     const selectNodeList = document.querySelectorAll('select');
     selectNodeList.forEach(item => {
@@ -63,16 +63,17 @@ const fetchCurrencies = async () => {
 }
 fetchCurrencies();
 
+// Fetch single currency
 const fetchCurrency = async (currency) => {
     const API_URL = `https://cdn.jsdelivr.net/gh/fawazahmed0/currency-api@1/latest/currencies/${currency}.json`;
 
     const response = await fetch(API_URL);
     const data = await response.json();
 
-    // console.log(data);
     return data;
 }
 
+// Format any date into "YYYY-MM-DD" format
 const formatDate = (date) => {
     var d = new Date(date),
         month = '' + (d.getMonth() + 1),
@@ -87,34 +88,53 @@ const formatDate = (date) => {
     return [year, month, day].join('-');
 }
 
-const fetchHistoryRates = async (currency, days = 7) => {
+// Display the rates chart
+const displayChart = async (fromCurrency, toCurrency, historyRates) => {
+    const historyRateDates = historyRates.map(rate => rate.date).reverse();
+    const historyRateValues = historyRates.map(rate => rate[toCurrency]).reverse();
+
+    let chartStatus = Chart.getChart("currencyChart");
+    if (chartStatus != undefined) {
+        chartStatus.destroy();
+    }
+
+    const label = `"${fromCurrency}" to "${toCurrency}" rate`;
+    const ctx = document.getElementById('currencyChart').getContext('2d');
+    const currencyChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: historyRateDates,
+            datasets: [{
+                label,
+                data: historyRateValues,
+                borderWidth: 1,
+                fill: true,
+            }]
+        }
+    });
+}
+
+const fetchHistoryRates = async (fromCurrency, toCurrency, days = 7) => {
     let dates = [];
     const today = new Date();
     
     for (let i = 0; i < days; i++) {
         const day = new Date(Date.now() - (1000 * 3600 * 24) * i);
         const formattedDay = formatDate(day);
-        const promise = fetch(`https://cdn.jsdelivr.net/gh/fawazahmed0/currency-api@1/${formattedDay}/currencies/eur.json`);
+
+        const promise = fetch(`https://cdn.jsdelivr.net/gh/fawazahmed0/currency-api@1/${formattedDay}/currencies/${fromCurrency}/${toCurrency}.json`);
         dates.push(promise);
     }
 
-    console.log(dates)
+    const historyRates = [];
 
-    const response = await Promise.all(dates);
-    const data = await response;
+    const response = await Promise.all(
+        dates.map(async (date) => {
+            const itemResponse = await date;
+            const itemData = await itemResponse.json();
+            historyRates.push(itemData);
+        })
+    );
 
-    const graphEl = document.getElementById('graph');
-
-    data.map(async (item) => {
-        const itemData = await item.json();
-        console.log(itemData);
-        const itemDataEl = document.createElement('p');
-        itemDataEl.textContent = itemData.date + ' ' + itemData[currency][currency];
-        graphEl.appendChild(itemDataEl);
-    })
-
-
-    // Promise.all()
+    displayChart(fromCurrency, toCurrency, historyRates);
 }
-
-// fetchHistoryRates('eur');
