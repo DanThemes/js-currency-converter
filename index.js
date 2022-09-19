@@ -109,6 +109,7 @@ const displayChart = async (fromCurrency, toCurrency, historyRates) => {
                 data: historyRateValues,
                 borderWidth: 1,
                 fill: true,
+                tension: 0.3
             }]
         }
     });
